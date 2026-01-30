@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bulkwamsg-db
+    environment:
+      POSTGRES_USER: bulkwamsg
+      POSTGRES_PASSWORD: bulkwamsg_password
+      POSTGRES_DB: bulkwamsg
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - bulkwamsg-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: bulkwamsg-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - bulkwamsg-network
+
+  whatsapp-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.whatsapp
+    container_name: bulkwamsg-whatsapp
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - WHATSAPP_SERVICE_SECRET=${WHATSAPP_SERVICE_SECRET}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+    ports:
+      - "3001:3001"
+    volumes:
+      - whatsapp_sessions:/app/sessions
+    depends_on:
+      - redis
+    networks:
+      - bulkwamsg-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  whatsapp_sessions:
+
+networks:
+  bulkwamsg-network:
+    driver: bridge

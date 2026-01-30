@@ -1,0 +1,33 @@
+FROM node:18-alpine
+
+# Install Chromium and dependencies for Puppeteer
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont
+
+# Tell Puppeteer to use installed Chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy service files
+COPY services/whatsapp ./services/whatsapp
+
+# Create sessions directory
+RUN mkdir -p /app/sessions
+
+EXPOSE 3001
+
+CMD ["npm", "run", "whatsapp:start"]

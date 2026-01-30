@@ -1,0 +1,299 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String
+  role          UserRole  @default(USER)
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  subscription  Subscription?
+  sessions      WhatsAppSession[]
+  contacts      Contact[]
+  contactGroups ContactGroup[]
+  campaigns     Campaign[]
+  templates     Template[]
+  analytics     Analytics[]
+
+  @@index([email])
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model Subscription {
+  id                String            @id @default(cuid())
+  userId            String            @unique
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  plan              SubscriptionPlan  @default(FREE)
+  status            SubscriptionStatus @default(ACTIVE)
+  
+  paypalSubscriptionId String?        @unique
+  paypalCustomerId     String?
+  
+  currentPeriodStart   DateTime       @default(now())
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean        @default(false)
+  
+  messagesLimit        Int            @default(100)
+  messagesUsed         Int            @default(0)
+  contactsLimit        Int            @default(500)
+  sessionsLimit        Int            @default(1)
+  
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([paypalSubscriptionId])
+}
+
+enum SubscriptionPlan {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  CANCELLED
+  PAST_DUE
+  TRIALING
+}
+
+model WhatsAppSession {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name        String   // User-defined name for this session
+  phoneNumber String?
+  status      SessionStatus @default(DISCONNECTED)
+  qrCode      String?  @db.Text
+  
+  sessionData String?  @db.Text // Encrypted session data
+  lastSeen    DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  campaigns   Campaign[]
+  messages    Message[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum SessionStatus {
+  CONNECTED
+  DISCONNECTED
+  CONNECTING
+  QR_READY
+  FAILED
+}
+
+model Contact {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  phoneNumber String
+  name        String?
+  email       String?
+  
+  customFields Json?   // Flexible custom fields
+  tags        String[] // Array of tags
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  groups      ContactGroupMember[]
+  messages    Message[]
+
+  @@unique([userId, phoneNumber])
+  @@index([userId])
+  @@index([phoneNumber])
+}
+
+model ContactGroup {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name        String
+  description String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  members     ContactGroupMember[]
+  campaigns   CampaignTarget[]
+
+  @@index([userId])
+}
+
+model ContactGroupMember {
+  id        String       @id @default(cuid())
+  groupId   String
+  group     ContactGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  contactId String
+  contact   Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  addedAt   DateTime     @default(now())
+
+  @@unique([groupId, contactId])
+  @@index([groupId])
+  @@index([contactId])
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  sessionId   String
+  session     WhatsAppSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  name        String
+  message     String   @db.Text
+  
+  status      CampaignStatus @default(DRAFT)
+  
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  totalContacts Int     @default(0)
+  sentCount     Int     @default(0)
+  deliveredCount Int    @default(0)
+  failedCount   Int     @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  targets     CampaignTarget[]
+  messages    Message[]
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([status])
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+}
+
+model CampaignTarget {
+  id         String       @id @default(cuid())
+  campaignId String
+  campaign   Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  groupId    String
+  group      ContactGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  
+  addedAt    DateTime     @default(now())
+
+  @@unique([campaignId, groupId])
+  @@index([campaignId])
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  sessionId   String
+  session     WhatsAppSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  contactId   String
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  phoneNumber String
+  message     String   @db.Text
+  
+  status      MessageStatus @default(PENDING)
+  error       String?
+  
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([campaignId])
+  @@index([contactId])
+  @@index([status])
+}
+
+enum MessageStatus {
+  PENDING
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+model Template {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name        String
+  message     String   @db.Text
+  variables   String[] // Array of variable names like ["name", "company"]
+  
+  category    String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Analytics {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  date        DateTime @default(now())
+  
+  messagesSent     Int @default(0)
+  messagesDelivered Int @default(0)
+  messagesFailed   Int @default(0)
+  
+  campaignsCreated Int @default(0)
+  campaignsCompleted Int @default(0)
+  
+  contactsAdded    Int @default(0)
+  
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+}
