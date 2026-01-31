@@ -15,6 +15,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         signOut: "/auth/login",
         error: "/auth/error",
     },
+    trustHost: true,
     providers: [
         Credentials({
             name: "credentials",
