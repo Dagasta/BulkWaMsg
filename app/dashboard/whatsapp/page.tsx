@@ -118,7 +118,7 @@ export default function WhatsAppPage() {
             const tempSessionId = `${session?.user?.id}-${Date.now()}`;
             setSessionId(tempSessionId);
 
-            const serviceUrl = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL || "http://localhost:3001";
+            const serviceUrl = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
             const response = await fetch(`${serviceUrl}/session/init`, {
                 method: "POST",
                 headers: {
