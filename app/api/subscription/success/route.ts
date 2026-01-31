@@ -69,13 +69,13 @@ export async function GET(req: NextRequest) {
         const isYearly = planId.includes("YEARLY");
         const plan = isYearly ? "ENTERPRISE" : "PROFESSIONAL"; // Map to your plan types
 
-        // Calculate end date
-        const startDate = new Date();
-        const endDate = new Date(startDate);
+        // Calculate period dates
+        const currentPeriodStart = new Date();
+        const currentPeriodEnd = new Date(currentPeriodStart);
         if (isYearly) {
-            endDate.setFullYear(endDate.getFullYear() + 1);
+            currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 1);
         } else {
-            endDate.setMonth(endDate.getMonth() + 1);
+            currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1);
         }
 
         // Create or update subscription in database
@@ -86,15 +86,15 @@ export async function GET(req: NextRequest) {
                 plan,
                 status: "ACTIVE",
                 paypalSubscriptionId: subscriptionId,
-                startDate,
-                endDate,
+                currentPeriodStart,
+                currentPeriodEnd,
             },
             update: {
                 plan,
                 status: "ACTIVE",
                 paypalSubscriptionId: subscriptionId,
-                startDate,
-                endDate,
+                currentPeriodStart,
+                currentPeriodEnd,
             },
         });
 

@@ -76,7 +76,6 @@ export const metadata: Metadata = {
     verification: {
         google: "your-google-verification-code",
         yandex: "your-yandex-verification-code",
-        bing: "your-bing-verification-code",
     },
     alternates: {
         canonical: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3004",

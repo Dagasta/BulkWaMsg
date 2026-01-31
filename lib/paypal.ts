@@ -1,3 +1,4 @@
+// @ts-ignore - PayPal SDK doesn't have TypeScript types
 import paypal from '@paypal/checkout-server-sdk'
 
 const environment = () => {

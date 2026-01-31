@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
             where: {
                 userId: session.user.id,
                 status: "ACTIVE",
-                endDate: {
+                currentPeriodEnd: {
                     gte: new Date(),
                 },
             },
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
                 ? {
                     plan: subscription.plan,
                     status: subscription.status,
-                    endDate: subscription.endDate,
+                    currentPeriodEnd: subscription.currentPeriodEnd,
                 }
                 : null,
         });
