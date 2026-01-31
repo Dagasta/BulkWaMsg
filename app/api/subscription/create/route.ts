@@ -5,9 +5,10 @@ const PAYPAL_API = process.env.PAYPAL_MODE === "live"
     ? "https://api-m.paypal.com"
     : "https://api-m.sandbox.paypal.com";
 
+// Use actual plan IDs from environment variables
 const PLAN_IDS = {
-    monthly: "P-MONTHLY-10USD",  // You'll create these in PayPal dashboard
-    yearly: "P-YEARLY-120USD",
+    monthly: process.env.PAYPAL_MONTHLY_PLAN_ID || "",
+    yearly: process.env.PAYPAL_YEARLY_PLAN_ID || "",
 };
 
 async function getPayPalAccessToken() {
@@ -23,6 +24,12 @@ async function getPayPalAccessToken() {
         },
         body: "grant_type=client_credentials",
     });
+
+    if (!response.ok) {
+        const error = await response.text();
+        console.error("PayPal auth error:", error);
+        throw new Error("Failed to get PayPal access token");
+    }
 
     const data = await response.json();
     return data.access_token;
@@ -42,8 +49,20 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
         }
 
-        const accessToken = await getPayPalAccessToken();
         const planId = PLAN_IDS[plan as "monthly" | "yearly"];
+
+        // Validate plan ID exists
+        if (!planId) {
+            console.error(`Missing PayPal plan ID for ${plan} plan`);
+            return NextResponse.json(
+                { error: `PayPal plan ID not configured for ${plan} plan` },
+                { status: 500 }
+            );
+        }
+
+        console.log(`Creating ${plan} subscription with plan ID: ${planId}`);
+
+        const accessToken = await getPayPalAccessToken();
 
         // Create subscription
         const subscriptionResponse = await fetch(`${PAYPAL_API}/v1/billing/subscriptions`, {
@@ -69,17 +88,37 @@ export async function POST(req: NextRequest) {
         const subscriptionData = await subscriptionResponse.json();
 
         if (!subscriptionResponse.ok) {
-            console.error("PayPal error:", subscriptionData);
+            console.error("PayPal subscription creation error:", {
+                status: subscriptionResponse.status,
+                statusText: subscriptionResponse.statusText,
+                error: subscriptionData,
+            });
             return NextResponse.json(
-                { error: "Failed to create subscription" },
+                {
+                    error: "Failed to create subscription",
+                    details: subscriptionData.message || "Unknown error"
+                },
                 { status: 500 }
             );
         }
 
         // Get approval URL
-        const approvalUrl = subscriptionData.links.find(
+        const approvalUrl = subscriptionData.links?.find(
             (link: any) => link.rel === "approve"
         )?.href;
+
+        if (!approvalUrl) {
+            console.error("No approval URL in PayPal response:", subscriptionData);
+            return NextResponse.json(
+                { error: "No approval URL received from PayPal" },
+                { status: 500 }
+            );
+        }
+
+        console.log("Subscription created successfully:", {
+            subscriptionId: subscriptionData.id,
+            approvalUrl,
+        });
 
         return NextResponse.json({
             subscriptionId: subscriptionData.id,
@@ -88,7 +127,7 @@ export async function POST(req: NextRequest) {
     } catch (error) {
         console.error("Error creating subscription:", error);
         return NextResponse.json(
-            { error: "Failed to create subscription" },
+            { error: "Failed to create subscription", details: error instanceof Error ? error.message : "Unknown error" },
             { status: 500 }
         );
     }
