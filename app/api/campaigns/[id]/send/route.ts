@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(
     request: NextRequest,
-    context: { params: Promise<{ id: string }> }
+    props: { params: Promise<{ id: string }> }
 ) {
     try {
         const session = await auth();
@@ -13,7 +13,8 @@ export async function POST(
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { id } = await context.params;
+        const params = await props.params;
+        const { id } = params;
         const campaignId = id;
 
         // Get campaign with contacts
