@@ -1,33 +1,27 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-export default auth((req) => {
-    const { pathname } = req.nextUrl
-    const isLoggedIn = !!req.auth
+export function middleware(request: NextRequest) {
+    const { pathname } = request.nextUrl
 
-    // Public routes
+    // Public routes that don't require authentication
     const isPublicRoute = pathname === '/' ||
         pathname.startsWith('/auth/') ||
         pathname.startsWith('/api/auth/') ||
-        pathname.startsWith('/api/webhooks/')
+        pathname.startsWith('/api/webhooks/') ||
+        pathname.startsWith('/_next/') ||
+        pathname.startsWith('/static/') ||
+        pathname.includes('.')
 
-    // Redirect logged-in users away from auth pages
-    if (isLoggedIn && pathname.startsWith('/auth/')) {
-        return NextResponse.redirect(new URL('/dashboard', req.url))
+    // Allow public routes
+    if (isPublicRoute) {
+        return NextResponse.next()
     }
 
-    // Protect dashboard routes
-    if (!isLoggedIn && pathname.startsWith('/dashboard')) {
-        return NextResponse.redirect(new URL('/auth/login', req.url))
-    }
-
-    // Protect admin routes
-    if (pathname.startsWith('/admin') && req.auth?.user?.role !== 'ADMIN') {
-        return NextResponse.redirect(new URL('/dashboard', req.url))
-    }
-
+    // For protected routes, let NextAuth handle authentication
+    // The actual auth check happens in the page/API route
     return NextResponse.next()
-})
+}
 
 export const config = {
     matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)'],
